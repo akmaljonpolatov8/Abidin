@@ -84,8 +84,8 @@ function registerIpcHandlers() {
     database.addStock(id, quantity),
   );
 
-  ipcMain.handle("sales:create", (_event, cartItems) =>
-    database.createSale(cartItems),
+  ipcMain.handle("sales:create", (_event, cartItems, cashierId) =>
+    database.createSale(cartItems, cashierId),
   );
   ipcMain.handle("sales:today-summary", () => database.getTodaySummary());
   ipcMain.handle("sales:week-summary", () => database.getWeekSummary());
@@ -162,6 +162,31 @@ function registerIpcHandlers() {
   ipcMain.handle("customers:history", (_event, customerId) =>
     database.getCustomerHistory(customerId),
   );
+
+  // Shift Management
+  ipcMain.handle("shifts:create", (_event, cashierId) => database.createShift(cashierId));
+  ipcMain.handle("shifts:get-open", () => database.getOpenShift());
+  ipcMain.handle("shifts:get-by-id", (_event, id) => database.getShiftById(id));
+  ipcMain.handle("shifts:close", (_event, id, totals) => database.closeShift(id, totals));
+  ipcMain.handle("shifts:history", (_event, limit = 20) => database.getShiftHistory(limit));
+
+  // Enhanced Reports
+  ipcMain.handle("reports:returns-count", (_event, period) => database.getReturnsCount(period));
+  ipcMain.handle("reports:today-returns", () => database.getTodayReturnsCount());
+  ipcMain.handle("reports:credits-summary", () => database.getCreditsSummary());
+  ipcMain.handle("reports:hourly-sales", () => database.getHourlySales());
+  ipcMain.handle("reports:daily-sales", (_event, days = 30) => database.getDailySales(days));
+  ipcMain.handle("reports:top-products-revenue", (_event, limit = 10, period = "today") =>
+    database.getTopProductsByRevenue(limit, period));
+  ipcMain.handle("reports:transactions-list", (_event, period = "today", limit = 50) =>
+    database.getTransactionsList(period, limit));
+  ipcMain.handle("reports:products-sales", (_event, period = "today") =>
+    database.getProductsSales(period));
+  ipcMain.handle("reports:credits-list", () => database.getCreditsList());
+  ipcMain.handle("reports:custom-summary", (_event, startDate, endDate) =>
+    database.getCustomSummary(startDate, endDate));
+  ipcMain.handle("reports:custom-payment-breakdown", (_event, startDate, endDate) =>
+    database.getCustomPaymentBreakdown(startDate, endDate));
 }
 
 app.whenReady().then(() => {

@@ -27,6 +27,7 @@ import AdminPanel from "./pages/AdminPanel";
 import Nasiya from "./pages/Nasiya";
 import Qaytarish from "./pages/Qaytarish";
 import Mijozlar from "./pages/Mijozlar";
+import KassirDashboard from "./components/KassirDashboard";
 
 const navItems = (user, isAdmin) => [
   { label: "Kassa", to: "/", icon: ScanLine },
@@ -141,7 +142,7 @@ function Shell({ user, onLogout, lowStockCount }) {
         <div className="min-h-0 flex-1 overflow-y-auto p-6">
           <div key={location.pathname} className="animate-fadeUp">
             <Routes>
-              <Route path="/" element={<Cashier user={user} />} />
+              <Route path="/" element={isAdmin ? <Cashier user={user} /> : <KassirDashboard user={user} onLogout={onLogout} />} />
               <Route path="/products" element={<Products isAdmin={isAdmin} />} />
               <Route path="/stock" element={<Stock />} />
               <Route path="/mijozlar" element={<Mijozlar />} />

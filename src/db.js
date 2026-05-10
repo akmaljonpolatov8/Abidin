@@ -107,6 +107,21 @@ function initializeSchema(db) {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS shifts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cashier_id INTEGER,
+      started_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      ended_at TEXT,
+      total_sales REAL DEFAULT 0,
+      naqt REAL DEFAULT 0,
+      plastik REAL DEFAULT 0,
+      click REAL DEFAULT 0,
+      nasiya REAL DEFAULT 0,
+      transaction_count INTEGER DEFAULT 0,
+      profit REAL DEFAULT 0,
+      status TEXT DEFAULT 'open'
+    );
   `);
 
   const columns = db.prepare("PRAGMA table_info(products)").all();
@@ -202,6 +217,10 @@ function initializeSchema(db) {
   if (!hasCustomerId) {
     db.prepare("ALTER TABLE sales ADD COLUMN customer_id INTEGER").run();
   }
+  const hasCashierId = salesColumns.some((column) => column.name === "cashier_id");
+  if (!hasCashierId) {
+    db.prepare("ALTER TABLE sales ADD COLUMN cashier_id INTEGER").run();
+  }
 
   const users = db.prepare("SELECT COUNT(*) as cnt FROM users").get();
   if (users.cnt === 0) {
@@ -256,7 +275,7 @@ function createStatements(db) {
     adjustStock: db.prepare(
       "UPDATE products SET stock = stock + ?, last_restock_at = ? WHERE id = ?",
     ),
-    insertSale: db.prepare("INSERT INTO sales (total, discount_total, sale_type, customer_name, customer_phone, payment_type, customer_id, sold_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"),
+    insertSale: db.prepare("INSERT INTO sales (total, discount_total, sale_type, customer_name, customer_phone, payment_type, customer_id, sold_at, cashier_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"),
     insertSaleItem: db.prepare(`
       INSERT INTO sale_items (sale_id, product_id, quantity, price_at_sale, discount_percent)
       VALUES (?, ?, ?, ?, ?)
@@ -541,6 +560,138 @@ function createStatements(db) {
       WHERE date(sold_at, 'localtime') >= date('now', '-30 days')
       GROUP BY payment_type
     `),
+    insertShift: db.prepare(`
+      INSERT INTO shifts (cashier_id, started_at, status)
+      VALUES (@cashier_id, @started_at, 'open')
+    `),
+    getOpenShift: db.prepare("SELECT * FROM shifts WHERE status = 'open' LIMIT 1"),
+    getShiftById: db.prepare("SELECT * FROM shifts WHERE id = ? LIMIT 1"),
+    closeShift: db.prepare(`
+      UPDATE shifts SET
+        ended_at = @ended_at,
+        total_sales = @total_sales,
+        naqt = @naqt,
+        plastik = @plastik,
+        click = @click,
+        nasiya = @nasiya,
+        transaction_count = @transaction_count,
+        profit = @profit,
+        status = @status
+      WHERE id = @id
+    `),
+    shiftHistory: db.prepare(`
+      SELECT * FROM shifts WHERE status = 'closed' ORDER BY ended_at DESC LIMIT ?
+    `),
+    returnsCount: db.prepare(`
+      SELECT COUNT(*) as count FROM returns
+      WHERE date(returned_at, 'localtime') BETWEEN date(?) AND date(?)
+    `),
+    todayReturnsCount: db.prepare(`
+      SELECT COUNT(*) as count FROM returns
+      WHERE date(returned_at, 'localtime') = date('now', 'localtime')
+    `),
+    creditsTotalActive: db.prepare(`
+      SELECT COALESCE(SUM(remaining), 0) as total FROM credits WHERE status = 'active'
+    `),
+    creditsCollectedToday: db.prepare(`
+      SELECT COALESCE(SUM(total_amount - remaining), 0) as total FROM credits
+      WHERE status = 'paid' AND date(created_at, 'localtime') = date('now', 'localtime')
+    `),
+    overdueCredits: db.prepare(`
+      SELECT * FROM credits
+      WHERE status = 'active' AND date(created_at, 'localtime') < date('now', '-7 days')
+      ORDER BY remaining DESC
+    `),
+    hourlySales: db.prepare(`
+      SELECT
+        CAST(strftime('%H', sold_at) AS INTEGER) as hour,
+        SUM(total) as total,
+        COUNT(*) as count
+      FROM sales
+      WHERE date(sold_at, 'localtime') BETWEEN date(?) AND date(?)
+      GROUP BY hour
+      ORDER BY hour ASC
+    `),
+    dailySales: db.prepare(`
+      SELECT
+        date(sold_at) as sold_date,
+        SUM(total) as total,
+        SUM(CASE WHEN payment_type = 'naqt' THEN total ELSE 0 END) as naqt,
+        SUM(CASE WHEN sale_type = 'credit' THEN total ELSE 0 END) as nasiya,
+        COUNT(*) as count
+      FROM sales
+      WHERE date(sold_at, 'localtime') BETWEEN date(?) AND date(?)
+      GROUP BY date(sold_at)
+      ORDER BY sold_date ASC
+    `),
+    topProductsRevenue: db.prepare(`
+      SELECT
+        products.id,
+        products.name,
+        SUM(sale_items.quantity) as quantity_sold,
+        SUM(sale_items.quantity * sale_items.price_at_sale) as revenue,
+        SUM(sale_items.quantity * (sale_items.price_at_sale - COALESCE(products.cost_price, 0))) as profit
+      FROM sale_items
+      INNER JOIN sales ON sales.id = sale_items.sale_id
+      INNER JOIN products ON products.id = sale_items.product_id
+      WHERE date(sales.sold_at, 'localtime') BETWEEN date(?) AND date(?)
+      GROUP BY products.id
+      ORDER BY revenue DESC
+      LIMIT ?
+    `),
+    transactionsList: db.prepare(`
+      SELECT
+        sales.id,
+        sales.sold_at,
+        time(sales.sold_at, 'localtime') as sold_time,
+        sales.cashier_id,
+        sales.total,
+        sales.payment_type,
+        sales.sale_type,
+        SUM(sale_items.quantity * (sale_items.price_at_sale - COALESCE(products.cost_price, 0))) as profit
+      FROM sales
+      LEFT JOIN sale_items ON sale_items.sale_id = sales.id
+      LEFT JOIN products ON products.id = sale_items.product_id
+      WHERE date(sales.sold_at, 'localtime') BETWEEN date(?) AND date(?)
+      GROUP BY sales.id
+      ORDER BY sales.sold_at DESC
+      LIMIT ?
+    `),
+    productsSales: db.prepare(`
+      SELECT
+        products.name as product_name,
+        sale_items.quantity,
+        sale_items.price_at_sale,
+        SUM(sale_items.quantity * sale_items.price_at_sale) as total,
+        SUM(sale_items.quantity * (sale_items.price_at_sale - COALESCE(products.cost_price, 0))) as profit,
+        date(sales.sold_at) as sold_date
+      FROM sale_items
+      INNER JOIN sales ON sales.id = sale_items.sale_id
+      INNER JOIN products ON products.id = sale_items.product_id
+      WHERE date(sales.sold_at, 'localtime') BETWEEN date(?) AND date(?)
+      GROUP BY sale_items.id
+      ORDER BY sales.sold_at DESC
+    `),
+    creditsList: db.prepare(`
+      SELECT * FROM credits ORDER BY created_at DESC
+    `),
+    customSummary: db.prepare(`
+      SELECT
+        COALESCE(SUM(total), 0) AS total_sales,
+        COALESCE(SUM(discount_total), 0) AS total_discount,
+        COUNT(*) AS transaction_count
+      FROM sales
+      WHERE date(sold_at, 'localtime') BETWEEN date(?) AND date(?)
+    `),
+    customPaymentBreakdown: db.prepare(`
+      SELECT
+        COALESCE(payment_type, 'naqt') as payment_type,
+        SUM(total) as total,
+        COUNT(*) as count
+      FROM sales
+      WHERE date(sold_at, 'localtime') BETWEEN date(?) AND date(?)
+      GROUP BY payment_type
+    `),
   };
 
   return {
@@ -625,7 +776,7 @@ function createStatements(db) {
       return statements.getProductById.get(productId);
     },
 
-    createSale(cartItems) {
+    createSale(cartItems, cashierId = null) {
       const items = Array.isArray(cartItems) ? cartItems : [];
       if (items.length === 0) {
         throw new Error("Savat bo'sh");
@@ -660,7 +811,7 @@ function createStatements(db) {
         const paymentType = cartItems[0]?.payment_type || "naqt";
         const customerId = cartItems[0]?.customer_id || null;
 
-        const saleResult = statements.insertSale.run(total, discountTotal, saleType, customerName, customerPhone, paymentType, customerId, soldAt);
+        const saleResult = statements.insertSale.run(total, discountTotal, saleType, customerName, customerPhone, paymentType, customerId, soldAt, cashierId);
         const saleId = saleResult.lastInsertRowid;
 
         let creditId = null;
@@ -1130,6 +1281,191 @@ function createStatements(db) {
         soldTime: sale.sold_time,
         paymentType: sale.payment_type,
       }));
+    },
+
+    createShift(cashierId) {
+      const result = statements.insertShift.run({
+        cashier_id: cashierId,
+        started_at: new Date().toISOString(),
+      });
+      return this.getShiftById(result.lastInsertRowid);
+    },
+
+    getOpenShift() {
+      const shift = statements.getOpenShift.get();
+      if (!shift) return null;
+      return {
+        id: shift.id,
+        cashierId: shift.cashier_id,
+        startedAt: shift.started_at,
+        status: shift.status,
+      };
+    },
+
+    getShiftById(id) {
+      const shift = statements.getShiftById.get(Number(id));
+      if (!shift) return null;
+      return {
+        id: shift.id,
+        cashierId: shift.cashier_id,
+        startedAt: shift.started_at,
+        endedAt: shift.ended_at,
+        totalSales: shift.total_sales,
+        naqt: shift.naqt,
+        plastik: shift.plastik,
+        click: shift.click,
+        nasiya: shift.nasiya,
+        transactionCount: shift.transaction_count,
+        profit: shift.profit,
+        status: shift.status,
+      };
+    },
+
+    closeShift(shiftId, totals) {
+      const shift = statements.getShiftById.get(Number(shiftId));
+      if (!shift) {
+        throw new Error("Smena topilmadi");
+      }
+      statements.closeShift.run({
+        ended_at: new Date().toISOString(),
+        total_sales: totals.totalSales,
+        naqt: totals.naqt,
+        plastik: totals.plastik,
+        click: totals.click,
+        nasiya: totals.nasiya,
+        transaction_count: totals.transactionCount,
+        profit: totals.profit,
+        status: "closed",
+        id: Number(shiftId),
+      });
+      return this.getShiftById(shiftId);
+    },
+
+    getShiftHistory(limit = 20) {
+      return statements.shiftHistory.all(Number(limit)).map((s) => ({
+        id: s.id,
+        cashierId: s.cashier_id,
+        startedAt: s.started_at,
+        endedAt: s.ended_at,
+        totalSales: s.total_sales,
+        naqt: s.naqt,
+        plastik: s.plastik,
+        click: s.click,
+        nasiya: s.nasiya,
+        transactionCount: s.transaction_count,
+        profit: s.profit,
+        status: s.status,
+      }));
+    },
+
+    getReturnsCount(startDate, endDate) {
+      const result = statements.returnsCount.get(startDate, endDate);
+      return result?.count || 0;
+    },
+
+    getTodayReturnsCount() {
+      const result = statements.todayReturnsCount.get();
+      return result?.count || 0;
+    },
+
+    getCreditsSummary(startDate, endDate) {
+      const totalActive = statements.creditsTotalActive.get();
+      const collectedToday = statements.creditsCollectedToday.get(startDate, endDate);
+      const overdueCredits = statements.overdueCredits.all();
+      return {
+        totalActive: totalActive?.total || 0,
+        collectedToday: collectedToday?.total || 0,
+        overdueCount: overdueCredits.length,
+        overdueAmount: overdueCredits.reduce((sum, c) => sum + (c.remaining || 0), 0),
+        topDebtors: overdueCredits.slice(0, 5).map((c) => ({
+          name: c.customer_name,
+          phone: c.customer_phone,
+          amount: c.remaining,
+        })),
+      };
+    },
+
+    getHourlySales(startDate, endDate) {
+      return statements.hourlySales.all(startDate, endDate).map((r) => ({
+        hour: r.hour,
+        total: r.total,
+        count: r.count,
+      }));
+    },
+
+    getDailySales(startDate, endDate) {
+      return statements.dailySales.all(startDate, endDate).map((r) => ({
+        date: r.sold_date,
+        total: r.total,
+        naqt: r.naqt || 0,
+        nasiya: r.nasiya || 0,
+        count: r.count,
+      }));
+    },
+
+    getTopProductsByRevenue(startDate, endDate, limit = 10) {
+      return statements.topProductsRevenue.all(startDate, endDate, Number(limit)).map((r) => ({
+        id: r.id,
+        name: r.name,
+        quantitySold: r.quantity_sold,
+        revenue: r.revenue,
+        profit: r.profit,
+      }));
+    },
+
+    getTransactionsList(startDate, endDate, limit = 100) {
+      return statements.transactionsList.all(startDate, endDate, Number(limit)).map((t) => ({
+        id: t.id,
+        soldAt: t.sold_at,
+        soldTime: t.sold_time,
+        cashierId: t.cashier_id,
+        total: t.total,
+        profit: t.profit,
+        paymentType: t.payment_type,
+        saleType: t.sale_type,
+      }));
+    },
+
+    getProductsSales(startDate, endDate) {
+      return statements.productsSales.all(startDate, endDate).map((r) => ({
+        productName: r.product_name,
+        quantity: r.quantity,
+        price: r.price_at_sale,
+        total: r.total,
+        profit: r.profit,
+        date: r.sold_date,
+      }));
+    },
+
+    getCreditsList(startDate, endDate) {
+      return statements.creditsList.all().map((c) => ({
+        id: c.id,
+        customerName: c.customer_name,
+        customerPhone: c.customer_phone,
+        totalAmount: c.total_amount,
+        paidAmount: c.paid_amount,
+        remaining: c.remaining,
+        createdAt: c.created_at,
+        status: c.status,
+      }));
+    },
+
+    getCustomSummary(startDate, endDate) {
+      const summary = statements.customSummary.get(startDate, endDate);
+      const breakdown = statements.customPaymentBreakdown.all(startDate, endDate);
+      const paymentStats = { naqt: 0, plastik: 0, click: 0, nasiya: 0 };
+      breakdown.forEach((b) => {
+        if (b.payment_type === "naqt") paymentStats.naqt = b.total;
+        else if (b.payment_type === "karta") paymentStats.plastik = b.total;
+        else if (b.payment_type === "click") paymentStats.click = b.total;
+        else if (b.payment_type === "credit") paymentStats.nasiya = b.total;
+      });
+      return {
+        totalSales: Number(summary?.total_sales || 0),
+        totalDiscount: Number(summary?.total_discount || 0),
+        transactionCount: Number(summary?.transaction_count || 0),
+        paymentStats,
+      };
     },
   };
 }
