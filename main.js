@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
+const fs = require("fs");
 const { createPosDatabase } = require("./src/db");
 
 let mainWindow = null;
@@ -16,7 +17,7 @@ function createMainWindow() {
     minHeight: 760,
     icon: path.join(__dirname, "build", "icon.ico"),
     backgroundColor: "#F5DEB3",
-    title: "ABIDiN",
+    title: "Abidin",
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -50,6 +51,21 @@ function registerIpcHandlers() {
     platform: process.platform,
   }));
 
+  ipcMain.handle("app:get-store-settings", () => database.getStoreSettings());
+  ipcMain.handle("app:set-store-settings", (_event, settings) => database.setStoreSettings(settings));
+  ipcMain.handle("app:save-logo", async (_event, logoData) => {
+    try {
+      const userDataPath = app.getPath("userData");
+      const logoPath = path.join(userDataPath, "store-logo.png");
+      const buffer = Buffer.from(logoData.replace(/^data:image\/\w+;base64,/, ""), "base64");
+      fs.writeFileSync(logoPath, buffer);
+      database.setSetting("store_logo", logoPath);
+      return { success: true, path: logoPath };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle("products:list", () => database.listProducts());
   ipcMain.handle("products:search", (_event, searchTerm) =>
     database.searchProducts(searchTerm),
@@ -72,16 +88,80 @@ function registerIpcHandlers() {
     database.createSale(cartItems),
   );
   ipcMain.handle("sales:today-summary", () => database.getTodaySummary());
+  ipcMain.handle("sales:week-summary", () => database.getWeekSummary());
+  ipcMain.handle("sales:month-summary", () => database.getMonthSummary());
   ipcMain.handle("sales:today-list", () => database.getTodaySales());
+  ipcMain.handle("sales:week-list", () => database.getWeekSales());
+  ipcMain.handle("sales:month-list", () => database.getMonthSales());
   ipcMain.handle("sales:top-products", (_event, limit = 5) =>
     database.getTopProductsToday(limit),
+  );
+  ipcMain.handle("sales:top-products-week", (_event, limit = 5) =>
+    database.getTopProductsWeek(limit),
+  );
+  ipcMain.handle("sales:top-products-month", (_event, limit = 5) =>
+    database.getTopProductsMonth(limit),
   );
   ipcMain.handle("sales:receipt", (_event, saleId) =>
     database.getReceiptBySaleId(saleId),
   );
+  ipcMain.handle("sales:for-return", (_event, saleId) =>
+    database.getSaleForReturn(saleId),
+  );
 
   ipcMain.handle("stock:list", () => database.getStockList());
   ipcMain.handle("stock:history", () => database.getRestockHistory());
+  ipcMain.handle("stock:low-stock", () => database.getLowStockProducts());
+  ipcMain.handle("stock:expired", () => database.getExpiredProducts());
+  ipcMain.handle("stock:expiring-soon", () => database.getExpiringSoonProducts());
+  ipcMain.handle("stock:expiring-month", () => database.getExpiringMonthProducts());
+
+  ipcMain.handle("credits:list", () => database.getCreditList());
+  ipcMain.handle("credits:get", (_event, id) => database.getCreditById(id));
+  ipcMain.handle("credits:payment", (_event, id, amount) =>
+    database.addCreditPayment(id, amount),
+  );
+
+  ipcMain.handle("returns:create", (_event, saleId, productId, quantity, price, reason) =>
+    database.createReturn(saleId, productId, quantity, price, reason),
+  );
+
+  ipcMain.handle("auth:login", (_event, username, password) =>
+    database.login(username, password),
+  );
+  ipcMain.handle("auth:create-user", (_event, username, password, role) =>
+    database.createUser(username, password, role),
+  );
+  ipcMain.handle("auth:list-users", () => database.listUsers());
+  ipcMain.handle("auth:delete-user", (_event, id) => database.deleteUser(id));
+
+  ipcMain.handle("reports:export", () => database.getAllSalesForExport());
+  ipcMain.handle("reports:get-export-data", () => database.getAllSalesForExport());
+
+  ipcMain.handle("customers:search", (_event, searchTerm) =>
+    database.searchCustomers(searchTerm),
+  );
+  ipcMain.handle("customers:get-by-phone", (_event, phone) =>
+    database.getCustomerByPhone(phone),
+  );
+  ipcMain.handle("customers:get-by-id", (_event, id) =>
+    database.getCustomerById(id),
+  );
+  ipcMain.handle("customers:create", (_event, name, phone) =>
+    database.createCustomer(name, phone),
+  );
+  ipcMain.handle("customers:update", (_event, id, name, phone) =>
+    database.updateCustomer(id, name, phone),
+  );
+  ipcMain.handle("customers:delete", (_event, id) =>
+    database.deleteCustomer(id),
+  );
+  ipcMain.handle("customers:stats", (_event, customerId) =>
+    database.getCustomerStats(customerId),
+  );
+  ipcMain.handle("customers:history", (_event, customerId) =>
+    database.getCustomerHistory(customerId),
+  );
 }
 
 app.whenReady().then(() => {

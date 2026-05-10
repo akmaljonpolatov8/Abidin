@@ -7,13 +7,22 @@ const emptyForm = {
   barcode: "",
   price: "",
   stock: 0,
+  unit: "dona",
+  cost_price: "",
+  discount_percent: "",
+  expiry_date: "",
 };
 
 function formatMoney(value) {
   return Number(value || 0).toLocaleString("uz-UZ");
 }
 
-function ProductModal({ open, mode, form, setForm, onClose, onSave, saving }) {
+function formatDate(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("uz-UZ", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+
+function ProductModal({ open, mode, form, setForm, onClose, onSave, saving, isAdmin }) {
   const barcodeRef = useRef(null);
 
   useEffect(() => {
@@ -95,6 +104,57 @@ function ProductModal({ open, mode, form, setForm, onClose, onSave, saving }) {
               placeholder="0"
             />
           </label>
+          {isAdmin && (
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-[#003366]">Tannarx (xarajat)</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.cost_price}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    cost_price: event.target.value,
+                  }))
+                }
+                className="field"
+                placeholder="0"
+              />
+            </label>
+          )}
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-[#003366]">Chegirma %</span>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              value={form.discount_percent}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  discount_percent: event.target.value,
+                }))
+              }
+              className="field"
+              placeholder="0"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-[#003366]">Muddati</span>
+            <input
+              type="date"
+              value={form.expiry_date}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  expiry_date: event.target.value,
+                }))
+              }
+              className="field"
+            />
+          </label>
           <label className="space-y-2 md:col-span-2">
             <span className="text-sm font-semibold text-[#003366]">
               Boshlang'ich qoldiq
@@ -113,6 +173,33 @@ function ProductModal({ open, mode, form, setForm, onClose, onSave, saving }) {
               className="field"
               placeholder="0"
             />
+          </label>
+          <label className="space-y-2 md:col-span-2">
+            <span className="text-sm font-semibold text-[#003366]">Birligi</span>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setForm((current) => ({ ...current, unit: "dona" }))}
+                className={`flex-1 rounded-[8px] px-4 py-3 text-sm font-medium transition-colors ${
+                  form.unit === "dona"
+                    ? "bg-[#003366] text-[#F5DEB3]"
+                    : "bg-white text-[#003366] border border-[rgba(0,51,102,0.2)]"
+                }`}
+              >
+                Dona
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((current) => ({ ...current, unit: "kg" }))}
+                className={`flex-1 rounded-[8px] px-4 py-3 text-sm font-medium transition-colors ${
+                  form.unit === "kg"
+                    ? "bg-[#003366] text-[#F5DEB3]"
+                    : "bg-white text-[#003366] border border-[rgba(0,51,102,0.2)]"
+                }`}
+              >
+                Kg
+              </button>
+            </div>
           </label>
         </div>
 
@@ -134,7 +221,7 @@ function ProductModal({ open, mode, form, setForm, onClose, onSave, saving }) {
   );
 }
 
-export default function Products() {
+export default function Products({ isAdmin = false }) {
   const [products, setProducts] = useState([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -189,6 +276,10 @@ export default function Products() {
         barcode: product.barcode,
         price: String(product.price),
         stock: String(product.stock ?? 0),
+        unit: product.unit === "kg" ? "kg" : "dona",
+        cost_price: String(product.cost_price || ""),
+        discount_percent: String(product.discount_percent || ""),
+        expiry_date: product.expiry_date || "",
       },
     });
   };
@@ -207,6 +298,10 @@ export default function Products() {
         barcode: modal.form.barcode,
         price: Number(modal.form.price),
         stock: Number(modal.form.stock),
+        unit: modal.form.unit || "dona",
+        cost_price: Number(modal.form.cost_price || 0),
+        discount_percent: Math.min(100, Math.max(0, Number(modal.form.discount_percent || 0))),
+        expiry_date: modal.form.expiry_date || null,
       };
       if (modal.mode === "create") {
         await window.abidin.createProduct(payload);
@@ -287,6 +382,10 @@ export default function Products() {
                 <th className="px-5 py-3">Nomi</th>
                 <th className="px-5 py-3">Barcode</th>
                 <th className="px-5 py-3">Narx</th>
+                {isAdmin && <th className="px-5 py-3">Tannarx</th>}
+                <th className="px-5 py-3">Chegirma</th>
+                <th className="px-5 py-3">Birligi</th>
+                <th className="px-5 py-3">Muddati</th>
                 <th className="px-5 py-3">Qoldiq</th>
                 <th className="px-5 py-3 text-right">Amallar</th>
               </tr>
@@ -296,7 +395,7 @@ export default function Products() {
                 <tr>
                   <td
                     className="px-5 py-10 text-center text-[#003366]/70"
-                    colSpan={5}
+                    colSpan={isAdmin ? 10 : 9}
                   >
                     Yuklanmoqda...
                   </td>
@@ -305,7 +404,7 @@ export default function Products() {
                 <tr>
                   <td
                     className="px-5 py-10 text-center text-[#003366]/70"
-                    colSpan={5}
+                    colSpan={isAdmin ? 10 : 9}
                   >
                     Mahsulot topilmadi
                   </td>
@@ -321,7 +420,52 @@ export default function Products() {
                     </td>
                     <td className="px-5 py-4">{product.barcode}</td>
                     <td className="px-5 py-4">
-                      {formatMoney(product.price)} so'm
+                      {Number(product.discount_percent || 0) > 0 ? (
+                        <div>
+                          <span className="text-[#003366]/50 line-through text-xs">
+                            {formatMoney(product.price)} so'm
+                          </span>
+                          <div className="font-medium text-[#2E7D32]">
+                            {formatMoney(product.price * (1 - (product.discount_percent || 0) / 100))} so'm
+                          </div>
+                        </div>
+                      ) : (
+                        <span>{formatMoney(product.price)} so'm</span>
+                      )}
+                    </td>
+                    {isAdmin && (
+                      <td className="px-5 py-4 text-[#003366]/70">
+                        {product.cost_price ? formatMoney(product.cost_price) + " so'm" : "-"}
+                      </td>
+                    )}
+                    <td className="px-5 py-4">
+                      {Number(product.discount_percent || 0) > 0 ? (
+                        <span className="rounded bg-[#C62828]/15 px-2 py-1 text-xs font-bold text-[#C62828]">
+                          -{product.discount_percent}%
+                        </span>
+                      ) : (
+                        <span className="text-[#003366]/50">-</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
+                      <span
+                        className={`inline-block rounded px-2 py-1 text-xs font-medium ${
+                          product.unit === "kg"
+                            ? "bg-[#2E7D32]/15 text-[#2E7D32]"
+                            : "bg-[#003366]/10 text-[#003366]"
+                        }`}
+                      >
+                        {product.unit === "kg" ? "Kg" : "Dona"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      {product.expiry_date ? (
+                        <span className={new Date(product.expiry_date) < new Date() ? "text-[#C62828] font-medium" : "text-[#003366]/70"}>
+                          {formatDate(product.expiry_date)}
+                        </span>
+                      ) : (
+                        <span className="text-[#003366]/50">-</span>
+                      )}
                     </td>
                     <td className="px-5 py-4">{Number(product.stock || 0)}</td>
                     <td className="px-5 py-4 text-right">
@@ -333,13 +477,15 @@ export default function Products() {
                         >
                           <PencilLine size={14} /> Tahrirlash
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => removeProduct(product)}
-                          className="btn-danger px-3 py-2 text-xs"
-                        >
-                          <Trash2 size={14} /> O'chirish
-                        </button>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => removeProduct(product)}
+                            className="btn-danger px-3 py-2 text-xs"
+                          >
+                            <Trash2 size={14} /> O'chirish
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -365,7 +511,7 @@ export default function Products() {
               key={product.id}
               product={product}
               onEdit={openEdit}
-              onDelete={removeProduct}
+              onDelete={isAdmin ? removeProduct : null}
             />
           ))
         )}
@@ -385,6 +531,7 @@ export default function Products() {
         onClose={closeModal}
         onSave={saveProduct}
         saving={saving}
+        isAdmin={isAdmin}
       />
     </div>
   );

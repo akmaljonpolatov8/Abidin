@@ -19,7 +19,7 @@ export default function ProductCard({
           </div>
         </div>
         <span className="rounded-full border border-[rgba(0,51,102,0.15)] bg-white/70 px-2.5 py-1 text-xs font-semibold text-[#003366]">
-          {Number(product.stock || 0)} dona
+          {product.unit === "kg" ? `${Number(product.stock || 0)} kg` : `${Number(product.stock || 0)} dona`}
         </span>
       </div>
 
