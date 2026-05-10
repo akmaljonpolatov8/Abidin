@@ -229,7 +229,16 @@ function initializeSchema(db) {
 
   const settings = db.prepare("SELECT COUNT(*) as cnt FROM settings").get();
   if (settings.cnt === 0) {
-    db.prepare("INSERT INTO settings (key, value) VALUES ('store_name', 'Abidin')").run();
+    const defaults = [
+      ["store_name", "Blokpost"],
+      ["store_phone", ""],
+      ["store_address", ""],
+      ["receipt_footer", "Rahmat! Yana keling 😊"],
+    ];
+    const insert = db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)");
+    for (const [key, value] of defaults) {
+      insert.run(key, value);
+    }
   }
 }
 
@@ -1189,6 +1198,15 @@ function createStatements(db) {
       return { success: true };
     },
 
+    changePassword(username, currentPassword, newPassword) {
+      const user = statements.userLogin.get(String(username), String(currentPassword));
+      if (!user) {
+        throw new Error("Joriy parol noto'g'ri");
+      }
+      db.prepare("UPDATE users SET password = ? WHERE username = ?").run(String(newPassword), String(username));
+      return { success: true };
+    },
+
     getAllSalesForExport() {
       return statements.getAllSalesForExport.all();
     },
@@ -1204,7 +1222,10 @@ function createStatements(db) {
 
     getStoreSettings() {
       return {
-        storeName: this.getSetting("store_name") || "Abidin",
+        storeName: this.getSetting("store_name") || "Blokpost",
+        storePhone: this.getSetting("store_phone") || "",
+        storeAddress: this.getSetting("store_address") || "",
+        receiptFooter: this.getSetting("receipt_footer") || "Rahmat! Yana keling 😊",
         storeLogo: this.getSetting("store_logo"),
       };
     },
@@ -1212,6 +1233,15 @@ function createStatements(db) {
     setStoreSettings(settings) {
       if (settings.storeName !== undefined) {
         this.setSetting("store_name", settings.storeName);
+      }
+      if (settings.storePhone !== undefined) {
+        this.setSetting("store_phone", settings.storePhone);
+      }
+      if (settings.storeAddress !== undefined) {
+        this.setSetting("store_address", settings.storeAddress);
+      }
+      if (settings.receiptFooter !== undefined) {
+        this.setSetting("receipt_footer", settings.receiptFooter);
       }
       if (settings.storeLogo !== undefined) {
         this.setSetting("store_logo", settings.storeLogo);

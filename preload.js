@@ -47,6 +47,8 @@ contextBridge.exposeInMainWorld("abidin", {
   createUser: (username, password, role) => invoke("auth:create-user", username, password, role),
   listUsers: () => invoke("auth:list-users"),
   deleteUser: (id) => invoke("auth:delete-user", id),
+  changePassword: (username, currentPassword, newPassword) =>
+    invoke("auth:change-password", username, currentPassword, newPassword),
 
   getExportData: () => invoke("reports:get-export-data"),
 

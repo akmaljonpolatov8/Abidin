@@ -134,6 +134,9 @@ function registerIpcHandlers() {
   );
   ipcMain.handle("auth:list-users", () => database.listUsers());
   ipcMain.handle("auth:delete-user", (_event, id) => database.deleteUser(id));
+  ipcMain.handle("auth:change-password", (_event, username, currentPassword, newPassword) =>
+    database.changePassword(username, currentPassword, newPassword),
+  );
 
   ipcMain.handle("reports:export", () => database.getAllSalesForExport());
   ipcMain.handle("reports:get-export-data", () => database.getAllSalesForExport());

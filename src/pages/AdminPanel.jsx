@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Plus, Trash2, Users, X, Upload, Image } from "lucide-react";
+import { Plus, Trash2, Users, X, Upload, Image, Save, KeyRound } from "lucide-react";
 
 function formatDate(value) {
   if (!value) return "Yo'q";
@@ -104,7 +104,18 @@ export default function AdminPanel({ user, onLogout }) {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [modal, setModal] = useState({ open: false, editUser: null });
-  const [storeSettings, setStoreSettings] = useState({ storeName: "Abidin", storeLogo: null });
+  const [storeSettings, setStoreSettings] = useState({
+    storeName: "Blokpost",
+    storePhone: "",
+    storeAddress: "",
+    receiptFooter: "Rahmat! Yana keling 😊",
+    storeLogo: null
+  });
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
   const fileInputRef = useRef(null);
 
   const loadUsers = async () => {
@@ -177,20 +188,42 @@ export default function AdminPanel({ user, onLogout }) {
     }
   };
 
-  const handleStoreNameChange = async (e) => {
-    const newName = e.target.value;
-    setStoreSettings((s) => ({ ...s, storeName: newName }));
+  const handleSettingChange = async (field, value) => {
+    setStoreSettings((s) => ({ ...s, [field]: value }));
+  };
+
+  const saveStoreSettings = async () => {
+    setSaving(true);
+    setNotice("");
     try {
-      await window.abidin.setStoreSettings({ storeName: newName });
-      setNotice("Do'kon nomi yangilandi");
+      await window.abidin.setStoreSettings({
+        storeName: storeSettings.storeName,
+        storePhone: storeSettings.storePhone,
+        storeAddress: storeSettings.storeAddress,
+        receiptFooter: storeSettings.receiptFooter,
+      });
+      setNotice("Sozlamalar saqlandi ✓");
     } catch (error) {
-      setNotice("Xatolik yuz berdi");
+      setNotice("Xatolik: " + error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      setNotice("Fayl hajmi 2MB dan oshmasligi kerak");
+      return;
+    }
+
+    const validTypes = ["image/png", "image/jpeg", "image/jpg"];
+    if (!validTypes.includes(file.type)) {
+      setNotice("Faqat PNG yoki JPG fayllar ruxsat etiladi");
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async () => {
@@ -220,6 +253,38 @@ export default function AdminPanel({ user, onLogout }) {
     }
   };
 
+  const changePassword = async () => {
+    if (!passwordForm.currentPassword || !passwordForm.newPassword) {
+      setNotice("Barcha maydonlarni to'ldiring");
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setNotice("Yangi parollar mos kelmadi");
+      return;
+    }
+    if (passwordForm.newPassword.length < 4) {
+      setNotice("Parol kamida 4 ta belgi bo'lishi kerak");
+      return;
+    }
+
+    setSaving(true);
+    setNotice("");
+    try {
+      await window.abidin.changePassword(user.username, passwordForm.currentPassword, passwordForm.newPassword);
+      setNotice("Parol muvaffaqiyatli o'zgartirildi ✓");
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (error) {
+      setNotice("Xatolik: " + error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getInitials = (name) => {
+    if (!name) return "?";
+    return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  };
+
   return (
     <div className="space-y-6">
       <section className="panel px-5 py-5">
@@ -243,71 +308,173 @@ export default function AdminPanel({ user, onLogout }) {
           </div>
         </div>
         {notice ? (
-          <p className={`mt-4 text-sm font-medium ${notice.includes("xatolik") || notice.includes("emas") ? "text-[#C62828]" : "text-[#2E7D32]"}`}>
+          <p className={`mt-4 text-sm font-medium ${notice.includes("xatolik") || notice.includes("emas") || notice.includes("noto'g'ri") || notice.includes("Mos") || notice.includes("kamida") ? "text-[#C62828]" : "text-[#2E7D32]"}`}>
             {notice}
           </p>
         ) : null}
       </section>
 
+      {/* Section 1: Do'kon ma'lumotlari */}
       <section className="panel px-5 py-5">
-        <h3 className="mb-4 text-lg font-bold text-[#003366]">Do'kon sozlamalari</h3>
-        <div className="grid gap-6 md:grid-cols-2">
-          <div>
-            <label className="space-y-2 block">
-              <span className="text-sm font-semibold text-[#003366]">Do'kon nomi</span>
-              <input
-                value={storeSettings.storeName || "Abidin"}
-                onChange={handleStoreNameChange}
-                className="field"
-                placeholder="Do'kon nomi"
-              />
-            </label>
-          </div>
-          <div>
-            <label className="space-y-2 block">
-              <span className="text-sm font-semibold text-[#003366]">Logo (PNG/JPG)</span>
-              <div className="flex items-center gap-3">
+        <h3 className="mb-5 text-lg font-bold text-[#003366]">Do'kon ma'lumotlari</h3>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Logo Section */}
+          <div className="lg:col-span-1">
+            <label className="space-y-3 block">
+              <span className="text-sm font-semibold text-[#003366]">Logo</span>
+              <div className="flex items-center gap-4">
                 {storeSettings.storeLogo ? (
                   <div className="relative">
                     <img
                       src={`file://${storeSettings.storeLogo}`}
                       alt="Logo"
-                      className="h-16 w-16 rounded-[8px] object-contain border border-[rgba(0,51,102,0.2)]"
+                      className="h-20 w-auto max-w-[200px] rounded-[8px] object-contain border border-[rgba(0,51,102,0.2)]"
                     />
                     <button
                       type="button"
                       onClick={removeLogo}
-                      className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#C62828] text-white"
+                      className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#C62828] text-white hover:bg-[#B71C1C]"
                     >
-                      <X size={10} />
+                      <X size={12} />
                     </button>
                   </div>
                 ) : (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-[8px] bg-[#003366]/10 text-[#003366]/50">
-                    <Image size={24} />
+                  <div className="flex h-20 w-32 items-center justify-center rounded-[8px] bg-[#003366]/10 border border-[rgba(0,51,102,0.2)]">
+                    <div className="text-center">
+                      <div className="mx-auto h-10 w-10 rounded-full bg-[#003366] text-[#F5DEB3] flex items-center justify-center text-lg font-bold">
+                        {getInitials(storeSettings.storeName)}
+                      </div>
+                    </div>
                   </div>
                 )}
+              </div>
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="btn-ghost flex items-center gap-2"
+                  className="btn-primary text-sm"
                 >
-                  <Upload size={16} /> Yuklash
+                  <Upload size={14} /> Logo yuklash
                 </button>
+                {storeSettings.storeLogo && (
+                  <button
+                    type="button"
+                    onClick={removeLogo}
+                    className="btn-ghost text-sm"
+                  >
+                    O'chirish
+                  </button>
+                )}
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/png,image/jpeg"
+                  accept="image/png,image/jpeg,image/jpg"
                   onChange={handleLogoUpload}
                   className="hidden"
                 />
               </div>
+              <p className="text-xs text-[#003366]/60">PNG yoki JPG, max 2MB</p>
             </label>
           </div>
+
+          {/* Form Fields */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-[#003366]">Do'kon nomi</span>
+                <input
+                  value={storeSettings.storeName}
+                  onChange={(e) => handleSettingChange("storeName", e.target.value)}
+                  className="field"
+                  placeholder="Blokpost"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-[#003366]">Telefon</span>
+                <input
+                  value={storeSettings.storePhone}
+                  onChange={(e) => handleSettingChange("storePhone", e.target.value)}
+                  className="field"
+                  placeholder="+998 90 123-45-67"
+                />
+              </label>
+            </div>
+            <label className="space-y-2 block">
+              <span className="text-sm font-semibold text-[#003366]">Manzil</span>
+              <input
+                value={storeSettings.storeAddress}
+                onChange={(e) => handleSettingChange("storeAddress", e.target.value)}
+                className="field"
+                placeholder="Toshkent, Amir Temur ko'chasi 1"
+              />
+            </label>
+            <label className="space-y-2 block">
+              <span className="text-sm font-semibold text-[#003366]">Chek pastki matni</span>
+              <input
+                value={storeSettings.receiptFooter}
+                onChange={(e) => handleSettingChange("receiptFooter", e.target.value)}
+                className="field"
+                placeholder="Rahmat! Yana keling 😊"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={saveStoreSettings}
+              disabled={saving}
+              className="btn-success"
+            >
+              <Save size={16} /> {saving ? "Saqlanmoqda..." : "Saqlash"}
+            </button>
+          </div>
         </div>
-        <p className="mt-4 text-xs text-[#003366]/70">
-          Logo sidebar va cheklarda ko'rinadi. Maksimal o'lcham: 120x40px
-        </p>
+      </section>
+
+      {/* Section 2: Admin paroli */}
+      <section className="panel px-5 py-5">
+        <h3 className="mb-5 text-lg font-bold text-[#003366]">Admin paroli</h3>
+        <div className="grid gap-4 md:grid-cols-3 max-w-2xl">
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-[#003366]">Joriy parol</span>
+            <input
+              type="password"
+              value={passwordForm.currentPassword}
+              onChange={(e) => setPasswordForm(p => ({ ...p, currentPassword: e.target.value }))}
+              className="field"
+              placeholder="****"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-[#003366]">Yangi parol</span>
+            <input
+              type="password"
+              value={passwordForm.newPassword}
+              onChange={(e) => setPasswordForm(p => ({ ...p, newPassword: e.target.value }))}
+              className="field"
+              placeholder="****"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-[#003366]">Tasdiqlash</span>
+            <input
+              type="password"
+              value={passwordForm.confirmPassword}
+              onChange={(e) => setPasswordForm(p => ({ ...p, confirmPassword: e.target.value }))}
+              className="field"
+              placeholder="****"
+            />
+          </label>
+        </div>
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={changePassword}
+            disabled={saving}
+            className="btn-primary"
+          >
+            <KeyRound size={16} /> {saving ? "O'zgartirilmoqda..." : "Parolni o'zgartirish"}
+          </button>
+        </div>
       </section>
 
       <section className="panel px-5 py-5">

@@ -1,12 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { X, Phone, MapPin } from "lucide-react";
 
 function formatMoney(value) {
   return Number(value || 0).toLocaleString("uz-UZ");
 }
 
 export default function ReceiptModal({ open, receipt, onClose }) {
-  const [storeSettings, setStoreSettings] = useState({ storeName: "Abidin", storeLogo: null });
+  const [storeSettings, setStoreSettings] = useState({
+    storeName: "Blokpost",
+    storePhone: "",
+    storeAddress: "",
+    receiptFooter: "Rahmat! Yana keling 😊",
+    storeLogo: null
+  });
 
   useEffect(() => {
     if (open && window.abidin?.getStoreSettings) {
@@ -29,6 +35,11 @@ export default function ReceiptModal({ open, receipt, onClose }) {
   const paymentType = receipt.sale?.payment_type || "naqt";
   const paymentLabel = paymentType === "naqt" ? "💵 Naqt" : paymentType === "karta" ? "💳 Karta" : "📱 Click/Payme";
 
+  const storeName = storeSettings.storeName || "Blokpost";
+  const storePhone = storeSettings.storePhone || "";
+  const storeAddress = storeSettings.storeAddress || "";
+  const receiptFooter = storeSettings.receiptFooter || "Rahmat! Yana keling 😊";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#003366]/55 p-4 backdrop-blur-sm">
       <div className="panel w-full max-w-xl overflow-hidden border border-[rgba(0,51,102,0.18)] bg-[#F5DEB3]">
@@ -49,39 +60,56 @@ export default function ReceiptModal({ open, receipt, onClose }) {
         </div>
 
         <div className="space-y-4 px-5 py-5 text-[#1a1a1a]">
+          {/* Header with Logo */}
           <div className="text-center">
             {storeSettings.storeLogo ? (
               <img
                 src={`file://${storeSettings.storeLogo}`}
                 alt="Logo"
-                className="mx-auto mb-2 max-h-16 object-contain"
+                className="mx-auto mb-3 h-auto max-w-[150px] rounded-[8px] object-contain"
               />
-            ) : (
-              <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-[#003366] text-[#F5DEB3]">
-                <span className="text-2xl font-bold">A</span>
+            ) : null}
+            <h3 className="text-lg font-bold text-[#003366]">{storeName}</h3>
+            {(storePhone || storeAddress) && (
+              <div className="mt-2 space-y-1 text-xs text-[#003366]/70">
+                {storePhone && (
+                  <p className="flex items-center justify-center gap-1">
+                    <Phone size={10} /> {storePhone}
+                  </p>
+                )}
+                {storeAddress && (
+                  <p className="flex items-center justify-center gap-1">
+                    <MapPin size={10} /> {storeAddress}
+                  </p>
+                )}
               </div>
             )}
-            <h3 className="text-lg font-bold text-[#003366]">{storeSettings.storeName}</h3>
           </div>
 
-          <div className="rounded-[8px] border border-[rgba(0,51,102,0.14)] bg-white/70 px-4 py-3">
-            <p className="text-sm font-semibold text-[#003366]">Sotuv vaqti</p>
-            <p className="mt-1 text-sm">{soldAt.toLocaleString("uz-UZ")}</p>
+          {/* Divider */}
+          <div className="border-b border-[rgba(0,51,102,0.2)]"></div>
+
+          {/* Sale Info */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-[8px] border border-[rgba(0,51,102,0.14)] bg-white/70 px-3 py-2">
+              <p className="text-xs text-[#003366]/60">Sotuv vaqti</p>
+              <p className="text-sm font-medium text-[#003366]">{soldAt.toLocaleString("uz-UZ")}</p>
+            </div>
+            <div className="rounded-[8px] border border-[rgba(0,51,102,0.14)] bg-white/70 px-3 py-2">
+              <p className="text-xs text-[#003366]/60">To'lov usuli</p>
+              <p className="text-sm font-medium text-[#003366]">{paymentLabel}</p>
+            </div>
           </div>
 
-          <div className="rounded-[8px] border border-[rgba(0,51,102,0.14)] bg-white/70 px-4 py-3">
-            <p className="text-sm font-semibold text-[#003366]">To'lov usuli</p>
-            <p className="mt-1 text-lg font-bold">{paymentLabel}</p>
-          </div>
-
+          {/* Items Table */}
           <div className="overflow-hidden rounded-[8px] border border-[rgba(0,51,102,0.14)] bg-white/70">
             <table className="w-full text-left text-sm">
               <thead className="bg-[#003366]/5 text-[#003366]">
                 <tr>
-                  <th className="px-4 py-3">Mahsulot</th>
-                  <th className="px-4 py-3">Soni</th>
-                  <th className="px-4 py-3">Narx</th>
-                  <th className="px-4 py-3 text-right">Jami</th>
+                  <th className="px-3 py-2">Mahsulot</th>
+                  <th className="px-3 py-2 text-center">Soni</th>
+                  <th className="px-3 py-2 text-right">Narx</th>
+                  <th className="px-3 py-2 text-right">Jami</th>
                 </tr>
               </thead>
               <tbody>
@@ -90,17 +118,17 @@ export default function ReceiptModal({ open, receipt, onClose }) {
                     key={item.id}
                     className="border-t border-[rgba(0,51,102,0.1)]"
                   >
-                    <td className="px-4 py-3 font-medium text-[#003366]">
+                    <td className="px-3 py-2 font-medium text-[#003366]">
                       {item.name}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2 text-center">
                       {Number(item.quantity).toLocaleString("uz-UZ", { minimumFractionDigits: 0, maximumFractionDigits: 3 })}
                     </td>
-                    <td className="px-4 py-3">
-                      {Number(item.price_at_sale).toLocaleString("uz-UZ")} so'm
+                    <td className="px-3 py-2 text-right">
+                      {Number(item.price_at_sale).toLocaleString("uz-UZ")}
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold">
-                      {Number(item.subtotal).toLocaleString("uz-UZ")} so'm
+                    <td className="px-3 py-2 text-right font-semibold">
+                      {Number(item.subtotal).toLocaleString("uz-UZ")}
                     </td>
                   </tr>
                 ))}
@@ -108,6 +136,7 @@ export default function ReceiptModal({ open, receipt, onClose }) {
             </table>
           </div>
 
+          {/* Total */}
           <div className="flex items-center justify-between rounded-[8px] bg-[#003366] px-4 py-4 text-[#F5DEB3]">
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-[#F5DEB3]/75">
@@ -123,8 +152,9 @@ export default function ReceiptModal({ open, receipt, onClose }) {
             </div>
           </div>
 
+          {/* Footer */}
           <p className="text-center text-sm text-[#003366]/70">
-            Rahmat! Yana keling 😊
+            {receiptFooter}
           </p>
         </div>
       </div>

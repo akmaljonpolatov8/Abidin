@@ -36,7 +36,7 @@ export default function Sidebar({ navItems, appMeta, user, storeSettings, lowSto
             <img
               src={`file://${storeLogo}`}
               alt="Logo"
-              className="h-11 w-11 rounded-[8px] object-contain bg-white"
+              className="h-10 w-auto max-w-[120px] object-contain bg-white rounded-[8px]"
             />
           ) : (
             <div className="flex h-11 w-11 items-center justify-center rounded-[8px] bg-[#F5DEB3] text-[#003366]">

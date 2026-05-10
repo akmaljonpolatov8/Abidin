@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Package2, Lock, User } from "lucide-react";
 
 export default function Login({ onLogin }) {
@@ -6,6 +6,24 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [storeSettings, setStoreSettings] = useState({
+    storeName: "Blokpost",
+    storeLogo: null
+  });
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await window.abidin.getStoreSettings();
+        if (settings) {
+          setStoreSettings(settings);
+        }
+      } catch (e) {
+        // use defaults
+      }
+    };
+    loadSettings();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,15 +53,26 @@ export default function Login({ onLogin }) {
     }
   };
 
+  const storeName = storeSettings.storeName || "Blokpost";
+  const storeLogo = storeSettings.storeLogo;
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#F5DEB3] p-4">
       <div className="w-full max-w-md">
         <div className="panel border border-[rgba(0,51,102,0.18)] bg-white/85 px-8 py-10 shadow-xl">
           <div className="mb-8 flex flex-col items-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[12px] bg-[#003366] text-[#F5DEB3] shadow-lg">
-              <Package2 size={32} />
-            </div>
-            <h1 className="text-2xl font-bold text-[#003366]">Abidin</h1>
+            {storeLogo ? (
+              <img
+                src={`file://${storeLogo}`}
+                alt="Logo"
+                className="mb-4 h-auto max-w-[180px] rounded-[8px] object-contain"
+              />
+            ) : (
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[12px] bg-[#003366] text-[#F5DEB3] shadow-lg">
+                <Package2 size={32} />
+              </div>
+            )}
+            <h1 className="text-2xl font-bold text-[#003366]">{storeName}</h1>
             <p className="mt-1 text-sm text-[#003366]/70">Tizimga kirish</p>
           </div>
 
