@@ -73,7 +73,19 @@ function initializeSchema(db) {
       sale_id INTEGER,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       status TEXT DEFAULT 'active',
+      customer_code TEXT,
       FOREIGN KEY(sale_id) REFERENCES sales(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS credit_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      credit_id INTEGER,
+      type TEXT,
+      amount REAL,
+      balance_after REAL,
+      note TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(credit_id) REFERENCES credits(id)
     );
 
     CREATE TABLE IF NOT EXISTS returns (
@@ -406,7 +418,7 @@ function createStatements(db) {
       ORDER BY expiry_date ASC
     `),
     creditList: db.prepare(`
-      SELECT * FROM credits WHERE status = 'active' ORDER BY created_at DESC
+      SELECT * FROM credits ORDER BY created_at DESC
     `),
     getCreditById: db.prepare("SELECT * FROM credits WHERE id = ? LIMIT 1"),
     insertCredit: db.prepare(`
@@ -415,6 +427,19 @@ function createStatements(db) {
     `),
     updateCredit: db.prepare(`
       UPDATE credits SET paid_amount = @paid_amount, remaining = @remaining, status = @status WHERE id = @id
+    `),
+    insertCreditTransaction: db.prepare(`
+      INSERT INTO credit_transactions (credit_id, type, amount, balance_after, note)
+      VALUES (@credit_id, @type, @amount, @balance_after, @note)
+    `),
+    getCreditTransactions: db.prepare(`
+      SELECT * FROM credit_transactions WHERE credit_id = ? ORDER BY created_at DESC
+    `),
+    getLastCustomerCode: db.prepare(`
+      SELECT customer_code FROM credits WHERE customer_code IS NOT NULL ORDER BY id DESC LIMIT 1
+    `),
+    updateCreditCode: db.prepare(`
+      UPDATE credits SET customer_code = ? WHERE id = ?
     `),
     insertReturn: db.prepare(`
       INSERT INTO returns (sale_id, product_id, quantity, price, reason)
@@ -604,7 +629,7 @@ function createStatements(db) {
     `),
     creditsCollectedToday: db.prepare(`
       SELECT COALESCE(SUM(total_amount - remaining), 0) as total FROM credits
-      WHERE status = 'paid' AND date(created_at, 'localtime') = date('now', 'localtime')
+      WHERE status = 'paid' AND date(created_at) = date('now')
     `),
     overdueCredits: db.prepare(`
       SELECT * FROM credits
@@ -1074,6 +1099,7 @@ function createStatements(db) {
         id: row.id,
         customerName: row.customer_name,
         customerPhone: row.customer_phone,
+        customerCode: row.customer_code,
         totalAmount: row.total_amount,
         paidAmount: row.paid_amount,
         remaining: row.remaining,
@@ -1088,6 +1114,7 @@ function createStatements(db) {
       if (!row) return null;
       return {
         id: row.id,
+        customerCode: row.customer_code,
         customerName: row.customer_name,
         customerPhone: row.customer_phone,
         totalAmount: row.total_amount,
@@ -1113,7 +1140,75 @@ function createStatements(db) {
         remaining: newRemaining,
         status: newStatus,
       });
+      statements.insertCreditTransaction.run({
+        credit_id: Number(id),
+        type: "payment",
+        amount: Number(amount),
+        balance_after: newRemaining,
+        note: "To'lov",
+      });
       return this.getCreditById(id);
+    },
+
+    addCreditDebt(id, amount, note = "") {
+      const credit = statements.getCreditById.get(Number(id));
+      if (!credit) {
+        throw new Error("Nasiya topilmadi");
+      }
+      const newTotal = credit.total_amount + Number(amount);
+      const newRemaining = newTotal - credit.paid_amount;
+      statements.updateCredit.run({
+        id: Number(id),
+        paid_amount: credit.paid_amount,
+        remaining: newRemaining,
+        status: "active",
+      });
+      statements.insertCreditTransaction.run({
+        credit_id: Number(id),
+        type: "debt",
+        amount: Number(amount),
+        balance_after: newRemaining,
+        note: note || "Yangi qarz",
+      });
+      return this.getCreditById(id);
+    },
+
+    getCreditTransactions(creditId) {
+      return statements.getCreditTransactions.all(Number(creditId)).map((row) => ({
+        id: row.id,
+        creditId: row.credit_id,
+        type: row.type,
+        amount: row.amount,
+        balanceAfter: row.balance_after,
+        note: row.note,
+        createdAt: row.created_at,
+      }));
+    },
+
+    getOrCreateCredit(customerName, customerPhone, saleId) {
+      if (customerPhone) {
+        const existing = db.prepare("SELECT * FROM credits WHERE customer_phone = ? AND status = 'active' LIMIT 1").get(String(customerPhone));
+        if (existing) {
+          return this.getCreditById(existing.id);
+        }
+      }
+      const lastCode = statements.getLastCustomerCode.get();
+      let newCode = "#0001";
+      if (lastCode && lastCode.customer_code) {
+        const num = parseInt(lastCode.customer_code.replace("#", ""), 10);
+        newCode = "#" + String(num + 1).padStart(4, "0");
+      }
+      const result = statements.insertCredit.run({
+        customer_name: customerName,
+        customer_phone: customerPhone || null,
+        total_amount: 0,
+        paid_amount: 0,
+        remaining: 0,
+        sale_id: saleId,
+      });
+      const creditId = result.lastInsertRowid;
+      statements.updateCreditCode.run(newCode, creditId);
+      return this.getCreditById(creditId);
     },
 
     createReturn(saleId, productId, quantity, price, reason) {
@@ -1400,7 +1495,7 @@ function createStatements(db) {
 
     getCreditsSummary(startDate, endDate) {
       const totalActive = statements.creditsTotalActive.get();
-      const collectedToday = statements.creditsCollectedToday.get(startDate, endDate);
+      const collectedToday = statements.creditsCollectedToday.get();
       const overdueCredits = statements.overdueCredits.all();
       return {
         totalActive: totalActive?.total || 0,

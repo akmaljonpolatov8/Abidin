@@ -121,6 +121,15 @@ function registerIpcHandlers() {
   ipcMain.handle("credits:payment", (_event, id, amount) =>
     database.addCreditPayment(id, amount),
   );
+  ipcMain.handle("credits:add-debt", (_event, id, amount, note) =>
+    database.addCreditDebt(id, amount, note),
+  );
+  ipcMain.handle("credits:transactions", (_event, creditId) =>
+    database.getCreditTransactions(creditId),
+  );
+  ipcMain.handle("credits:create-or-get", (_event, customerName, customerPhone, saleId) =>
+    database.getOrCreateCredit(customerName, customerPhone, saleId),
+  );
 
   ipcMain.handle("returns:create", (_event, saleId, productId, quantity, price, reason) =>
     database.createReturn(saleId, productId, quantity, price, reason),

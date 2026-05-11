@@ -37,6 +37,11 @@ contextBridge.exposeInMainWorld("abidin", {
   getExpiringMonthProducts: () => invoke("stock:expiring-month"),
 
   getCreditList: () => invoke("credits:list"),
+  listCredits: () => invoke("credits:list"),
+  addCreditDebt: (id, amount, note) => invoke("credits:add-debt", id, amount, note),
+  getCreditTransactions: (creditId) => invoke("credits:transactions", creditId),
+  getOrCreateCredit: (customerName, customerPhone, saleId) =>
+    invoke("credits:create-or-get", customerName, customerPhone, saleId),
   getCreditById: (id) => invoke("credits:get", id),
   addCreditPayment: (id, amount) => invoke("credits:payment", id, amount),
 

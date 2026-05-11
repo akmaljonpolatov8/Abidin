@@ -36,8 +36,10 @@ const navItems = (user, isAdmin) => [
   { label: "Mijozlar", to: "/mijozlar", icon: Users },
   { label: "Nasiya", to: "/nasiya", icon: CreditCard },
   { label: "Qaytarish", to: "/qaytarish", icon: ArrowLeftReturn },
-  { label: "Hisobot", to: "/reports", icon: BarChart3 },
-  ...(isAdmin ? [{ label: "Admin", to: "/admin", icon: Settings }] : []),
+  ...(isAdmin ? [
+    { label: "Hisobot", to: "/reports", icon: BarChart3 },
+    { label: "Admin", to: "/admin", icon: Settings }
+  ] : []),
 ];
 
 function ArrowLeftReturn(props) {
