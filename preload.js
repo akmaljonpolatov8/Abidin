@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld("abidin", {
   getCreditTransactions: (creditId) => invoke("credits:transactions", creditId),
   getOrCreateCredit: (customerName, customerPhone, saleId) =>
     invoke("credits:create-or-get", customerName, customerPhone, saleId),
+  createNewCredit: (customerName, customerPhone, amount, note) =>
+    invoke("credits:create-new", customerName, customerPhone, amount, note),
   getCreditById: (id) => invoke("credits:get", id),
   addCreditPayment: (id, amount) => invoke("credits:payment", id, amount),
 
@@ -49,6 +51,7 @@ contextBridge.exposeInMainWorld("abidin", {
     invoke("returns:create", saleId, productId, quantity, price, reason),
 
   login: (username, password) => invoke("auth:login", username, password),
+  verifyAdminPassword: (password) => invoke("auth:verify-admin-password", password),
   createUser: (username, password, role) => invoke("auth:create-user", username, password, role),
   listUsers: () => invoke("auth:list-users"),
   deleteUser: (id) => invoke("auth:delete-user", id),

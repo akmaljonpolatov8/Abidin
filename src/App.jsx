@@ -16,6 +16,8 @@ import {
   Store,
   ArrowLeftRight,
   Users,
+  X,
+  Lock,
 } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import Cashier from "./pages/Cashier";
@@ -28,6 +30,83 @@ import Nasiya from "./pages/Nasiya";
 import Qaytarish from "./pages/Qaytarish";
 import Mijozlar from "./pages/Mijozlar";
 import KassirDashboard from "./components/KassirDashboard";
+
+// Admin Password Modal
+function AdminPasswordModal({ open, onClose, onVerify, error, verifying }) {
+  const [password, setPassword] = useState("");
+
+  useEffect(() => {
+    if (open) setPassword("");
+  }, [open]);
+
+  if (!open) return null;
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (password.trim()) {
+      onVerify(password.trim());
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm rounded-xl bg-[#F5DEB3] p-6 shadow-2xl">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#003366]">
+              <Lock size={20} className="text-[#F5DEB3]" />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-widest text-[#003366]/60">Admin panel</p>
+              <h2 className="text-lg font-bold text-[#003366]">Tasdiqlash</h2>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-[#003366]/10 rounded-lg">
+            <X size={20} className="text-[#003366]" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-[#003366] mb-2">Parol</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg border border-[rgba(0,51,102,0.2)] bg-white focus:outline-none focus:ring-2 focus:ring-[#003366]/30"
+              placeholder="Parolni kiriting"
+              autoFocus
+            />
+            {error && (
+              <p className="mt-2 text-sm text-[#C62828] font-medium">{error}</p>
+            )}
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              disabled={verifying || !password.trim()}
+              className="flex-1 bg-[#003366] text-[#F5DEB3] py-3 px-4 rounded-lg font-semibold hover:bg-[#002244] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {verifying ? "Tekshirilmoqda..." : "Kirish"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-3 rounded-lg border border-[rgba(0,51,102,0.2)] text-[#003366] hover:bg-[#003366]/5 font-medium"
+            >
+              Bekor
+            </button>
+          </div>
+        </form>
+
+        <p className="mt-4 text-xs text-[#003366]/60 text-center">
+          Parol 1 soat davomida saqlanadi
+        </p>
+      </div>
+    </div>
+  );
+}
 
 const navItems = (user, isAdmin) => [
   { label: "Kassa", to: "/", icon: ScanLine },
@@ -62,7 +141,69 @@ function Shell({ user, onLogout, lowStockCount }) {
   const [appMeta, setAppMeta] = useState({ name: "Abidin", version: "1.0.0" });
   const [storeSettings, setStoreSettings] = useState({ storeName: "Abidin", storeLogo: null });
 
+  // Admin session state
+  const [adminVerified, setAdminVerified] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminError, setAdminError] = useState("");
+  const [adminVerifying, setAdminVerifying] = useState(false);
+  const [pendingAdmin, setPendingAdmin] = useState(false);
+
   const isAdmin = user?.role === "admin";
+
+  // Check admin session on mount
+  useEffect(() => {
+    const adminSession = localStorage.getItem("abidin_admin_session");
+    if (adminSession) {
+      try {
+        const { timestamp } = JSON.parse(adminSession);
+        const hoursSince = (Date.now() - timestamp) / (1000 * 60 * 60);
+        if (hoursSince < 1) {
+          setAdminVerified(true);
+        } else {
+          localStorage.removeItem("abidin_admin_session");
+        }
+      } catch (e) {
+        localStorage.removeItem("abidin_admin_session");
+      }
+    }
+  }, []);
+
+  // Handle navigation to admin
+  useEffect(() => {
+    if (location.pathname === "/admin" && isAdmin && !adminVerified) {
+      setPendingAdmin(true);
+      setShowAdminModal(true);
+    }
+  }, [location.pathname, isAdmin, adminVerified]);
+
+  const verifyAdminPassword = async (password) => {
+    setAdminVerifying(true);
+    setAdminError("");
+    try {
+      const isValid = await window.abidin.verifyAdminPassword(password);
+      if (isValid) {
+        setAdminVerified(true);
+        localStorage.setItem("abidin_admin_session", JSON.stringify({ timestamp: Date.now() }));
+        setShowAdminModal(false);
+        setPendingAdmin(false);
+      } else {
+        setAdminError("Parol noto'g'ri");
+      }
+    } catch (error) {
+      setAdminError("Xatolik yuz berdi");
+    } finally {
+      setAdminVerifying(false);
+    }
+  };
+
+  const closeAdminModal = () => {
+    setShowAdminModal(false);
+    setPendingAdmin(false);
+    // Redirect away from admin if not verified
+    if (!adminVerified && location.pathname === "/admin") {
+      window.location.hash = "#/";
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -151,12 +292,20 @@ function Shell({ user, onLogout, lowStockCount }) {
               <Route path="/reports" element={isAdmin ? <Reports /> : <Navigate to="/" replace />} />
               <Route path="/nasiya" element={isAdmin ? <Nasiya /> : <Navigate to="/" replace />} />
               <Route path="/qaytarish" element={<Qaytarish />} />
-              <Route path="/admin" element={isAdmin ? <AdminPanel user={user} onLogout={onLogout} /> : <Navigate to="/" replace />} />
+              <Route path="/admin" element={isAdmin && adminVerified ? <AdminPanel user={user} onLogout={onLogout} /> : <Navigate to="/" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
         </div>
       </main>
+
+      <AdminPasswordModal
+        open={showAdminModal}
+        onClose={closeAdminModal}
+        onVerify={verifyAdminPassword}
+        error={adminError}
+        verifying={adminVerifying}
+      />
     </div>
   );
 }

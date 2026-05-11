@@ -130,6 +130,9 @@ function registerIpcHandlers() {
   ipcMain.handle("credits:create-or-get", (_event, customerName, customerPhone, saleId) =>
     database.getOrCreateCredit(customerName, customerPhone, saleId),
   );
+  ipcMain.handle("credits:create-new", (_event, customerName, customerPhone, amount, note) =>
+    database.createNewCredit(customerName, customerPhone, amount, note),
+  );
 
   ipcMain.handle("returns:create", (_event, saleId, productId, quantity, price, reason) =>
     database.createReturn(saleId, productId, quantity, price, reason),
@@ -137,6 +140,9 @@ function registerIpcHandlers() {
 
   ipcMain.handle("auth:login", (_event, username, password) =>
     database.login(username, password),
+  );
+  ipcMain.handle("auth:verify-admin-password", (_event, password) =>
+    database.verifyAdminPassword(password),
   );
   ipcMain.handle("auth:create-user", (_event, username, password, role) =>
     database.createUser(username, password, role),

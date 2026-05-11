@@ -234,6 +234,13 @@ function initializeSchema(db) {
     db.prepare("ALTER TABLE sales ADD COLUMN cashier_id INTEGER").run();
   }
 
+  // Migrate credits table to add customer_code column
+  const creditsColumns = db.prepare("PRAGMA table_info(credits)").all();
+  const hasCustomerCode = creditsColumns.some((column) => column.name === "customer_code");
+  if (!hasCustomerCode) {
+    db.prepare("ALTER TABLE credits ADD COLUMN customer_code TEXT").run();
+  }
+
   const users = db.prepare("SELECT COUNT(*) as cnt FROM users").get();
   if (users.cnt === 0) {
     db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run("admin", "abidin2025", "admin");
@@ -1211,6 +1218,35 @@ function createStatements(db) {
       return this.getCreditById(creditId);
     },
 
+    createNewCredit(customerName, customerPhone, initialAmount, note = "") {
+      const lastCode = statements.getLastCustomerCode.get();
+      let newCode = "#0001";
+      if (lastCode && lastCode.customer_code) {
+        const num = parseInt(lastCode.customer_code.replace("#", ""), 10);
+        newCode = "#" + String(num + 1).padStart(4, "0");
+      }
+      const result = statements.insertCredit.run({
+        customer_name: customerName,
+        customer_phone: customerPhone || null,
+        total_amount: Number(initialAmount) || 0,
+        paid_amount: 0,
+        remaining: Number(initialAmount) || 0,
+        sale_id: null,
+      });
+      const creditId = result.lastInsertRowid;
+      statements.updateCreditCode.run(newCode, creditId);
+      if (initialAmount > 0) {
+        statements.insertCreditTransaction.run({
+          credit_id: creditId,
+          type: "debt",
+          amount: Number(initialAmount),
+          balance_after: Number(initialAmount),
+          note: note || "Yangi nasiya",
+        });
+      }
+      return this.getCreditById(creditId);
+    },
+
     createReturn(saleId, productId, quantity, price, reason) {
       const product = statements.getProductByIdRaw.get(Number(productId));
       if (!product) {
@@ -1269,6 +1305,11 @@ function createStatements(db) {
         username: user.username,
         role: user.role,
       };
+    },
+
+    verifyAdminPassword(password) {
+      const admin = db.prepare("SELECT id FROM users WHERE role = 'admin' AND password = ? LIMIT 1").get(String(password));
+      return admin !== null;
     },
 
     createUser(username, password, role) {
