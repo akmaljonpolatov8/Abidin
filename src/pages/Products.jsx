@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { PencilLine, Plus, Search, Trash2, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import ProductCard from "../components/ProductCard";
 
 const emptyForm = {
@@ -19,10 +19,23 @@ function formatMoney(value) {
 
 function formatDate(value) {
   if (!value) return "-";
-  return new Date(value).toLocaleString("uz-UZ", { year: "numeric", month: "2-digit", day: "2-digit" });
+  return new Date(value).toLocaleString("uz-UZ", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
 }
 
-function ProductModal({ open, mode, form, setForm, onClose, onSave, saving, isAdmin }) {
+function ProductModal({
+  open,
+  mode,
+  form,
+  setForm,
+  onClose,
+  onSave,
+  saving,
+  isAdmin,
+}) {
   const barcodeRef = useRef(null);
 
   useEffect(() => {
@@ -106,7 +119,9 @@ function ProductModal({ open, mode, form, setForm, onClose, onSave, saving, isAd
           </label>
           {isAdmin && (
             <label className="space-y-2">
-              <span className="text-sm font-semibold text-[#003366]">Tannarx (xarajat)</span>
+              <span className="text-sm font-semibold text-[#003366]">
+                Tannarx (xarajat)
+              </span>
               <input
                 type="number"
                 min="0"
@@ -124,7 +139,9 @@ function ProductModal({ open, mode, form, setForm, onClose, onSave, saving, isAd
             </label>
           )}
           <label className="space-y-2">
-            <span className="text-sm font-semibold text-[#003366]">Chegirma %</span>
+            <span className="text-sm font-semibold text-[#003366]">
+              Chegirma %
+            </span>
             <input
               type="number"
               min="0"
@@ -142,7 +159,9 @@ function ProductModal({ open, mode, form, setForm, onClose, onSave, saving, isAd
             />
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-semibold text-[#003366]">Muddati</span>
+            <span className="text-sm font-semibold text-[#003366]">
+              Muddati
+            </span>
             <input
               type="date"
               value={form.expiry_date}
@@ -175,11 +194,15 @@ function ProductModal({ open, mode, form, setForm, onClose, onSave, saving, isAd
             />
           </label>
           <label className="space-y-2 md:col-span-2">
-            <span className="text-sm font-semibold text-[#003366]">Birligi</span>
+            <span className="text-sm font-semibold text-[#003366]">
+              Birligi
+            </span>
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => setForm((current) => ({ ...current, unit: "dona" }))}
+                onClick={() =>
+                  setForm((current) => ({ ...current, unit: "dona" }))
+                }
                 className={`flex-1 rounded-[8px] px-4 py-3 text-sm font-medium transition-colors ${
                   form.unit === "dona"
                     ? "bg-[#003366] text-[#F5DEB3]"
@@ -190,7 +213,9 @@ function ProductModal({ open, mode, form, setForm, onClose, onSave, saving, isAd
               </button>
               <button
                 type="button"
-                onClick={() => setForm((current) => ({ ...current, unit: "kg" }))}
+                onClick={() =>
+                  setForm((current) => ({ ...current, unit: "kg" }))
+                }
                 className={`flex-1 rounded-[8px] px-4 py-3 text-sm font-medium transition-colors ${
                   form.unit === "kg"
                     ? "bg-[#003366] text-[#F5DEB3]"
@@ -300,7 +325,10 @@ export default function Products({ isAdmin = false }) {
         stock: Number(modal.form.stock),
         unit: modal.form.unit || "dona",
         cost_price: Number(modal.form.cost_price || 0),
-        discount_percent: Math.min(100, Math.max(0, Number(modal.form.discount_percent || 0))),
+        discount_percent: Math.min(
+          100,
+          Math.max(0, Number(modal.form.discount_percent || 0)),
+        ),
         expiry_date: modal.form.expiry_date || null,
       };
       if (modal.mode === "create") {
@@ -353,17 +381,16 @@ export default function Products({ isAdmin = false }) {
           </button>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[260px]">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#003366]/55"
-              size={16}
-            />
+          <div className="input-container min-w-[260px] flex-1">
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Nomi yoki barcode bo'yicha qidirish"
-              className="field pl-10"
+              className="search-input w-full"
             />
+            <svg className="search-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18.031 16.617l4.283 4.282-1.415 1.415-4.282-4.283A8.96 8.96 0 0 1 11 20c-4.968 0-9-4.032-9-9s4.032-9 9-9 9 4.032 9 9a8.96 8.96 0 0 1-1.969 5.617zm-2.006-.742A6.977 6.977 0 0 0 18 11c0-3.868-3.133-7-7-7-3.868 0-7 3.132-7 7 0 3.867 3.132 7 7 7a6.977 6.977 0 0 0 4.875-1.975l.15-.15z"></path>
+            </svg>
           </div>
           <button type="button" onClick={loadProducts} className="btn-ghost">
             Yangilash
@@ -426,7 +453,11 @@ export default function Products({ isAdmin = false }) {
                             {formatMoney(product.price)} so'm
                           </span>
                           <div className="font-medium text-[#2E7D32]">
-                            {formatMoney(product.price * (1 - (product.discount_percent || 0) / 100))} so'm
+                            {formatMoney(
+                              product.price *
+                                (1 - (product.discount_percent || 0) / 100),
+                            )}{" "}
+                            so'm
                           </div>
                         </div>
                       ) : (
@@ -435,7 +466,9 @@ export default function Products({ isAdmin = false }) {
                     </td>
                     {isAdmin && (
                       <td className="px-5 py-4 text-[#003366]/70">
-                        {product.cost_price ? formatMoney(product.cost_price) + " so'm" : "-"}
+                        {product.cost_price
+                          ? formatMoney(product.cost_price) + " so'm"
+                          : "-"}
                       </td>
                     )}
                     <td className="px-5 py-4">
@@ -460,7 +493,13 @@ export default function Products({ isAdmin = false }) {
                     </td>
                     <td className="px-5 py-4">
                       {product.expiry_date ? (
-                        <span className={new Date(product.expiry_date) < new Date() ? "text-[#C62828] font-medium" : "text-[#003366]/70"}>
+                        <span
+                          className={
+                            new Date(product.expiry_date) < new Date()
+                              ? "text-[#C62828] font-medium"
+                              : "text-[#003366]/70"
+                          }
+                        >
                           {formatDate(product.expiry_date)}
                         </span>
                       ) : (
@@ -473,17 +512,68 @@ export default function Products({ isAdmin = false }) {
                         <button
                           type="button"
                           onClick={() => openEdit(product)}
-                          className="btn-ghost px-3 py-2 text-xs"
+                          className="edit-btn"
                         >
-                          <PencilLine size={14} /> Tahrirlash
+                          Tahrirlash
+                          <svg viewBox="0 0 512 512" aria-hidden="true">
+                            <path d="M410.3 231l11.3-11.3-33.9-33.9-62.1-62.1L291.7 89.8l-11.3 11.3-22.6 22.6L58.6 322.9c-10.4 10.4-18 23.3-22.2 37.4L1 480.7c-2.5 8.4-.2 17.5 6.1 23.7s15.3 8.5 23.7 6.1l120.3-35.4c14.1-4.2 27-11.8 37.4-22.2L387.7 253.7 410.3 231zM160 399.4l-9.1 22.7c-4 3.1-8.5 5.4-13.3 6.9L59.4 452l23-78.1c1.4-4.9 3.8-9.4 6.9-13.3l22.7-9.1v32c0 8.8 7.2 16 16 16h32zM362.7 18.7L348.3 33.2 325.7 55.8 314.3 67.1l33.9 33.9 62.1 62.1 33.9 33.9 11.3-11.3 22.6-22.6 14.5-14.5c25-25 25-65.5 0-90.5L453.3 18.7c-25-25-65.5-25-90.5 0zm-47.4 168l-144 144c-6.2 6.2-16.4 6.2-22.6 0s-6.2-16.4 0-22.6l144-144c6.2-6.2 16.4 6.2 22.6 0s6.2 16.4 0 22.6z" />
+                          </svg>
                         </button>
                         {isAdmin && (
                           <button
                             type="button"
                             onClick={() => removeProduct(product)}
-                            className="btn-danger px-3 py-2 text-xs"
+                            className="bin-button"
+                            aria-label="O'chirish"
                           >
-                            <Trash2 size={14} /> O'chirish
+                            <svg
+                              className="bin-top"
+                              viewBox="0 0 39 7"
+                              fill="none"
+                            >
+                              <line
+                                y1="5"
+                                x2="39"
+                                y2="5"
+                                stroke="white"
+                                strokeWidth="4"
+                              ></line>
+                              <line
+                                x1="12"
+                                y1="1.5"
+                                x2="26.0357"
+                                y2="1.5"
+                                stroke="white"
+                                strokeWidth="3"
+                              ></line>
+                            </svg>
+                            <svg
+                              className="bin-bottom"
+                              viewBox="0 0 33 39"
+                              fill="none"
+                            >
+                              <mask
+                                id={`product-bin-${product.id}`}
+                                fill="white"
+                              >
+                                <path d="M0 0H33V35C33 37.2091 31.2091 39 29 39H4C1.79086 39 0 37.2091 0 35V0Z"></path>
+                              </mask>
+                              <path
+                                d="M0 0H33H0ZM37 35C37 39.4183 33.4183 43 29 43H4C-0.418278 43 -4 39.4183 -4 35H4H29H37ZM4 43C-0.418278 43 -4 39.4183 -4 35V0H4V35V43ZM37 0V35C37 39.4183 33.4183 43 29 43V35V0H37Z"
+                                fill="white"
+                                mask={`url(#product-bin-${product.id})`}
+                              ></path>
+                              <path
+                                d="M12 6L12 29"
+                                stroke="white"
+                                strokeWidth="4"
+                              ></path>
+                              <path
+                                d="M21 6V29"
+                                stroke="white"
+                                strokeWidth="4"
+                              ></path>
+                            </svg>
                           </button>
                         )}
                       </div>
